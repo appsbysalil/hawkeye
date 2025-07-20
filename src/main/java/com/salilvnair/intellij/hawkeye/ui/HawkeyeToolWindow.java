@@ -124,14 +124,39 @@ public class HawkeyeToolWindow {
                         return;
                     }
                     ApplicationManager.getApplication().invokeLater(() -> {
-                        List<ResultEntry> results = JarScannerService.searchInProjectDependencies(project, query, classpath);
-                        if (results.isEmpty()) {
-                            Messages.showInfoMessage("No matches found.", "Pomerian");
-                        } else {
-                            for (ResultEntry entry : results) {
-                                tableModel.addRow(new Object[]{ entry.jarName, entry.fileName, entry.lineNumber });
+//                        List<ResultEntry> results = JarScannerService.searchInProjectDependencies(project, query, classpath);
+//                        if (results.isEmpty()) {
+//                            Messages.showInfoMessage("No matches found.", "Pomerian");
+//                        } else {
+//                            for (ResultEntry entry : results) {
+//                                tableModel.addRow(new Object[]{ entry.jarName, entry.fileName, entry.lineNumber });
+//                            }
+//                        }
+                        new Task.Backgroundable(project, "Searching dependencies") {
+                            List<ResultEntry> results;
+
+                            public void run(@NotNull ProgressIndicator indicator) {
+                                classpath = getProjectClasspath(project);
+                                if (classpath == null || classpath.isEmpty()) {
+                                    ApplicationManager.getApplication().invokeLater(() ->
+                                            Messages.showErrorDialog("Could not resolve project classpath.", "Hawkeye"));
+                                    return;
+                                }
+                                results = JarScannerService.searchInProjectDependencies(project, query, classpath);
                             }
-                        }
+
+                            @Override
+                            public void onSuccess() {
+                                if (results == null || results.isEmpty()) {
+                                    Messages.showInfoMessage("No matches found.", "Hawkeye");
+                                } else {
+                                    tableModel.setRowCount(0);
+                                    for (ResultEntry entry : results) {
+                                        tableModel.addRow(new Object[]{ entry.jarName, entry.fileName, entry.lineNumber });
+                                    }
+                                }
+                            }
+                        }.queue();
                     });
                 }
             }.queue();

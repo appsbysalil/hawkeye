@@ -15,7 +15,7 @@ tasks.processResources {
 }
 
 group = "com.salilvnair"
-version = "1.0.0"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -40,6 +40,7 @@ intellijPlatform {
     pluginConfiguration {
         ideaVersion {
             sinceBuild = "242"
+            untilBuild = "253.*"
         }
 
         changeNotes = """

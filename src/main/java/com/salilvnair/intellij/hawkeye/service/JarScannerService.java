@@ -8,90 +8,95 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.salilvnair.intellij.hawkeye.model.ResultEntry;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
 
 public class JarScannerService {
-    public static void main(String[] args) {
-        System.out.println(searchInM2("spring-boot"));
-    }
+
+    private static final int THREAD_POOL_SIZE = 6;
 
     public static List<ResultEntry> searchInProjectDependencies(Project project, String query, String classpath) {
-        List<ResultEntry> results = new ArrayList<>();
-        String[] jars = classpath.split(File.pathSeparator);
+        List<ResultEntry> allResults = Collections.synchronizedList(new ArrayList<>());
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        List<Future<?>> futures = new ArrayList<>();
 
-        for (String jarPath : jars) {
+        for (String jarPath : classpath.split(File.pathSeparator)) {
             if (!jarPath.endsWith(".jar")) continue;
-            try (JarFile jarFile = new JarFile(jarPath)) {
-                Enumeration<JarEntry> entries = jarFile.entries();
-                while (entries.hasMoreElements()) {
-                    JarEntry entry = entries.nextElement();
-                    if (entry.isDirectory() || entry.getSize() == 0) continue;
+            futures.add(executor.submit(() -> scanJar(project, jarPath, query, allResults)));
+        }
 
-                    String entryName = entry.getName();
+        // Wait for all tasks to complete
+        for (Future<?> f : futures) {
+            try {
+                f.get();
+            } catch (Exception ignored) {}
+        }
 
-                    // Handle .class files using IntelliJ decompiler
-                    if (entryName.endsWith(".class")) {
-                        String jarUrl = "jar://" + jarPath + "!/" + entryName;
-                        VirtualFile vFile = VirtualFileManager.getInstance().findFileByUrl(jarUrl);
+        executor.shutdown();
+        return allResults;
+    }
 
-                        if (vFile != null) {
-                            PsiFile psiFile = PsiManager.getInstance(project).findFile(vFile);
-                            if (psiFile != null) {
-                                String content = ApplicationManager.getApplication().runReadAction(
-                                        (Computable<String>) psiFile::getText
-                                );
-                                String[] lines = content.split("\\n");
-                                System.out.println(entryName + "----Lines in PSI content during search: " + lines.length);
-                                for (int i = 0; i < lines.length; i++) {
-                                    if (lines[i].contains(query)) {
-                                        results.add(new ResultEntry(
-                                                new File(jarPath).getName(),
-                                                entryName,
-                                                i + 1
-                                        ));
-                                        break;
-                                    }
+    private static void scanJar(Project project, String jarPath, String query, List<ResultEntry> resultCollector) {
+        try (JarFile jarFile = new JarFile(jarPath)) {
+            Enumeration<JarEntry> entries = jarFile.entries();
+
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                if (entry.isDirectory() || entry.getSize() == 0) continue;
+
+                String entryName = entry.getName();
+
+                if (entryName.endsWith(".class")) {
+                    String jarUrl = "jar://" + jarPath + "!/" + entryName;
+                    VirtualFile vFile = VirtualFileManager.getInstance().findFileByUrl(jarUrl);
+
+                    if (vFile != null) {
+                        PsiFile psiFile  = ApplicationManager.getApplication().runReadAction(
+                                (com.intellij.openapi.util.Computable<PsiFile>) () ->
+                                        PsiManager.getInstance(project).findFile(vFile)
+                        );
+                        if (psiFile != null) {
+                            String content = ApplicationManager.getApplication().runReadAction(
+                                    (Computable<String>) psiFile::getText
+                            );
+                            String[] lines = content.split("\\n");
+                            for (int i = 0; i < lines.length; i++) {
+                                if (lines[i].contains(query)) {
+                                    resultCollector.add(new ResultEntry(
+                                            new File(jarPath).getName(), entryName, i + 1
+                                    ));
+                                    break;
                                 }
                             }
                         }
                     }
-                    // Handle regular text files (.java, .xml, .properties, etc.)
-                    else {
-                        try (InputStream is = jarFile.getInputStream(entry);
-                             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-                            String line;
-                            int lineNum = 1;
-                            while ((line = reader.readLine()) != null) {
-                                if (line.contains(query)) {
-                                    results.add(new ResultEntry(
-                                            new File(jarPath).getName(),
-                                            entryName,
-                                            lineNum
-                                    ));
-                                    break;
-                                }
-                                lineNum++;
+                } else {
+                    try (InputStream is = jarFile.getInputStream(entry);
+                         BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                        String line;
+                        int lineNum = 1;
+                        while ((line = reader.readLine()) != null) {
+                            if (line.contains(query)) {
+                                resultCollector.add(new ResultEntry(
+                                        new File(jarPath).getName(), entryName, lineNum
+                                ));
+                                break;
                             }
-                        } catch (Exception ignored) {}
-                    }
+                            lineNum++;
+                        }
+                    } catch (Exception ignored) {}
                 }
-            } catch (Exception ignored) {}
-        }
-
-        return results;
+            }
+        } catch (Exception ignored) {}
     }
 
     public static List<String> searchInM2(String query) {
@@ -116,7 +121,7 @@ public class JarScannerService {
                     }
                 } catch (Exception ignored) {}
             });
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
         return results;
