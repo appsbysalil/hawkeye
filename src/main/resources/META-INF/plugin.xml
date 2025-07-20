@@ -1,0 +1,47 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>com.salilvnair.hawkeye</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>Hawkeye</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="support@salilvnair.com" url="https://www.salilvnair.com">Salil V Nair</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description>
+        <![CDATA[
+            HawkEye is a powerful IntelliJ plugin that lets you <b>search strings deep inside your classpath</b> — including inside JARs, POMs, and other project dependencies.<br><br>
+            Designed for developers who demand <em>precision and speed</em>, HawkEye gives you the ability to:<br>
+            <ul>
+              <li>Scan entire classpaths for matching strings</li>
+              <li>Explore inside JARs, libraries, and Maven artifacts</li>
+              <li>View contextual matches with blazing-fast results</li>
+            </ul>
+            Comes with a beautiful, developer-friendly UI and supports advanced search filters.<br><br>
+            <em>See through your code. Instantly.</em>
+        ]]>
+    </description>
+
+
+    <change-notes><![CDATA[
+        v1.0.0 released
+    ]]>
+    </change-notes>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Hawkeye"
+                    anchor="right"
+                    icon="/icons/hawkeye.svg"
+                    factoryClass="com.salilvnair.intellij.hawkeye.HawkeyeToolWindowFactory"/>
+    </extensions>
+</idea-plugin>
