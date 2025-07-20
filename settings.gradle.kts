@@ -1,1 +1,8 @@
-rootProject.name = "com.salilvnair.intellij.hawkeye"
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = "hawkeye"

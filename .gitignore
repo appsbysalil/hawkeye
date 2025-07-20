@@ -44,3 +44,4 @@ bin/
 
 .run
 .env
+/.intellijPlatform/self-update.lock
